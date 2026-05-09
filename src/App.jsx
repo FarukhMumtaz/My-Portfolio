@@ -1294,30 +1294,40 @@ function Contact() {
   const update = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
   
 const handleSubmit = async (e) => {
-    if (e) e.preventDefault(); // Form reload hone se rokne ke liye
+    e.preventDefault();
     setSending(true);
-    
+
+    const accessKey = import.meta.env.VITE_WEB3FORMS_KEY || "d38a752b-1f79-4f36-a1d6-3e267711e578";
+
     try {
       const response = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_KEY, // Key yahan aise aayegi
+          access_key: accessKey,
           name: form.name,
           email: form.email,
           message: form.message,
         }),
       });
 
-      if (response.ok) {
-        setForm({ name: "", email: "", message: "" });
-        setSubmitted(true);
-        // 5 second baad success message hatane ke liye (optional)
-        setTimeout(() => setSubmitted(false), 5000);
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Web3Forms API error", {
+          status: response.status,
+          statusText: response.statusText,
+          body: result,
+          rawResponse: response,
+        });
+        throw new Error(result?.message || `Web3Forms responded with status ${response.status}`);
       }
+
+      setForm({ name: "", email: "", message: "" });
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 5000);
     } catch (error) {
       console.error("Form submission error:", error);
-      alert("Submission failed. Please check your connection.");
+      alert(`Submission failed: ${error?.message || "Please check your connection."}`);
     } finally {
       setSending(false);
     }
@@ -1411,7 +1421,7 @@ const handleSubmit = async (e) => {
                 </p>
               </div>
             ) : (
-              <form onSubmit={e => { e.preventDefault(); handleSubmit(); }} style={{ display: "flex", flexDirection: "column", gap: T.sp4 }} noValidate>
+              <form onSubmit={(e) => handleSubmit(e)} style={{ display: "flex", flexDirection: "column", gap: T.sp4 }} noValidate>
                 <FormField label="Name" type="text" placeholder="Your name"
                   value={form.name} onChange={update("name")}
                   focused={focused === "name"}
